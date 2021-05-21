@@ -1,20 +1,8 @@
-import selectors, socket
-import types
+import selectors, socket, sys, types
+
 
 sel = selectors.DefaultSelector()
 
-host = '127.0.0.1'
-port = 56432
-
-lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-lsock.bind((host, port))
-lsock.listen()
-print(f'Listening on: {(host, port)}')
-
-# Configure socket in non-blocking mode
-lsock.setblocking(False)
-# Register socket to be monitored by sel.select() for read event.
-sel.register(lsock, selectors.EVENT_READ, data=None)
 
 
 
@@ -47,12 +35,41 @@ def service_connection(key, mask):
 
 
 
-while True:
-    events = sel.select(timeout=None)                # blocks until there are sockets ready for I/O. It returns a list of (key, events)tuples, one for each socket.
-    for key, mask in events:                         # key - SelectorKey namedtuple with fileobj attrib key. mask - event mask of the operations that are ready.
-        if key.data is None:
-            accept_wrapper(key.fileobj)              # Get new socket object and register it with selector
-        else:
-            service_connection(key, mask)            # service the client socket passing key and mask
+# while True:
+#     events = sel.select(timeout=None)                # blocks until there are sockets ready for I/O. It returns a list of (key, events)tuples, one for each socket.
+#     for key, mask in events:                         # key - SelectorKey namedtuple with fileobj attrib key. mask - event mask of the operations that are ready.
+#         if key.data is None:
+#             accept_wrapper(key.fileobj)              # Get new socket object and register it with selector
+#         else:
+#             service_connection(key, mask)            # service the client socket passing key and mask
+
+
+if len(sys.argv) != 3:
+    print("usage:", sys.argv[0], "<host> <port>")
+    sys.exit(1)
+
+host, port = sys.argv[1], int(sys.argv[2])
+lsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+lsock.bind((host, port))
+lsock.listen()
+print("listening on", (host, port))
+
+# Configure socket in non-blocking mode
+lsock.setblocking(False)
+# Register socket to be monitored by sel.select() for read event.
+sel.register(lsock, selectors.EVENT_READ, data=None)
+
+try:
+    while True:
+        events = sel.select(timeout=None)
+        for key, mask in events:
+            if key.data is None:
+                accept_wrapper(key.fileobj)
+            else:
+                service_connection(key, mask)
+except KeyboardInterrupt:
+    print("caught keyboard interrupt, exiting")
+finally:
+    sel.close()
 
 
